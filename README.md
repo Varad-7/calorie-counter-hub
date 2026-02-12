@@ -17,6 +17,7 @@ A responsive multi-profile calorie tracking web app for managing calorie deficit
 - Automatic daily total calculation and deficit metrics
 - Interactive bar chart for daily calorie intake history
 - Data persistence using browser local storage
+- Optional Supabase cloud sync (free tier compatible)
 
 Sample import file: `/Users/varadvikaspatil/LocalDocuments/PersonelDocs/CalorieCounter/sample-food-import.csv`
 
@@ -39,6 +40,35 @@ Then open `http://localhost:8080`.
 - The app ships with a broad starter food/drinks dataset.
 - For full real-world coverage, keep adding custom foods as needed.
 - All entries and settings are stored in local storage for this browser.
+
+## Supabase Setup (Free Tier)
+
+1. Create a project on [Supabase](https://supabase.com/).
+2. Open `SQL Editor` and run:
+
+```sql
+create table if not exists public.calorie_states (
+  sync_key text primary key,
+  payload jsonb not null,
+  updated_at timestamptz not null default now()
+);
+
+alter table public.calorie_states disable row level security;
+```
+
+3. In Supabase dashboard, copy:
+   - `Project URL` from `Settings -> API`
+   - `anon public key` from `Settings -> API`
+4. In app UI, open `Supabase Cloud Sync (Free)` and fill:
+   - Supabase URL
+   - Supabase Anon Key
+   - Sync Key (choose any shared key string)
+5. Click:
+   - `Save Sync Settings`
+   - `Push to Cloud` (upload local data)
+   - `Pull from Cloud` (download cloud data on another device)
+
+Security note: this free/basic setup uses a shared sync key and disabled RLS for easy setup.
 
 ## Publish on GitHub Pages
 

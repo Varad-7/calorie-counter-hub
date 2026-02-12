@@ -85,6 +85,32 @@
             </article>
           </section>
 
+          <section class="subpanel">
+            <h3>Supabase Cloud Sync (Free)</h3>
+            <form id="supabaseForm" class="inline-form">
+              <label>
+                Supabase URL
+                <input id="supabaseUrlInput" type="url" placeholder="https://xxxx.supabase.co" />
+              </label>
+              <label>
+                Supabase Anon Key
+                <input id="supabaseAnonKeyInput" type="text" placeholder="Paste anon public key" />
+              </label>
+              <label>
+                Sync Key
+                <input id="supabaseSyncKeyInput" type="text" placeholder="e.g. varad-family-sync" />
+              </label>
+              <label class="checkbox-line">
+                <input id="supabaseAutoSyncInput" type="checkbox" />
+                Auto push on every save
+              </label>
+              <button type="submit">Save Sync Settings</button>
+              <button id="supabasePushBtn" type="button">Push to Cloud</button>
+              <button id="supabasePullBtn" type="button">Pull from Cloud</button>
+            </form>
+            <p class="muted small" id="supabaseStatusText">Cloud sync is not configured.</p>
+          </section>
+
           <section class="summary-grid" id="summaryGrid"></section>
 
           <section>

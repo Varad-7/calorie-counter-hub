@@ -139,6 +139,17 @@ label {
   color: var(--muted);
 }
 
+.checkbox-line {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.88rem;
+}
+
+.checkbox-line input[type="checkbox"] {
+  width: auto;
+}
+
 input,
 button,
 select {

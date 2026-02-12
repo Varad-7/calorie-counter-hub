@@ -25,10 +25,19 @@ const customFoodForm = document.getElementById("customFoodForm");
 const importFoodForm = document.getElementById("importFoodForm");
 const foodCsvFile = document.getElementById("foodCsvFile");
 const foodOptions = document.getElementById("foodOptions");
+const supabaseForm = document.getElementById("supabaseForm");
+const supabaseUrlInput = document.getElementById("supabaseUrlInput");
+const supabaseAnonKeyInput = document.getElementById("supabaseAnonKeyInput");
+const supabaseSyncKeyInput = document.getElementById("supabaseSyncKeyInput");
+const supabaseAutoSyncInput = document.getElementById("supabaseAutoSyncInput");
+const supabasePushBtn = document.getElementById("supabasePushBtn");
+const supabasePullBtn = document.getElementById("supabasePullBtn");
+const supabaseStatusText = document.getElementById("supabaseStatusText");
 
 const seedFoods = buildSeedFoods();
 let selectedDate = isoDate(new Date());
 let chartModel = { bars: [], points: [], hoverIndex: -1, targetCalories: 0 };
+let autoSyncTimer = null;
 
 let state = loadState();
 
@@ -70,6 +79,9 @@ function attachListeners() {
 
   customFoodForm.addEventListener("submit", onAddCustomFood);
   importFoodForm.addEventListener("submit", onImportFoodsCsv);
+  supabaseForm.addEventListener("submit", onSaveSupabaseSettings);
+  supabasePushBtn.addEventListener("click", onPushToSupabase);
+  supabasePullBtn.addEventListener("click", onPullFromSupabase);
 
   historyChart.addEventListener("mousemove", onChartMouseMove);
   historyChart.addEventListener("mouseleave", () => {
@@ -245,6 +257,83 @@ async function onImportFoodsCsv(event) {
   window.alert(`Imported ${newFoods.length} foods. Skipped ${skipped}.`);
 }
 
+function onSaveSupabaseSettings(event) {
+  event.preventDefault();
+
+  const url = normalizeSupabaseUrl(supabaseUrlInput.value.trim());
+  const anonKey = supabaseAnonKeyInput.value.trim();
+  const syncKey = supabaseSyncKeyInput.value.trim();
+  const autoSync = Boolean(supabaseAutoSyncInput.checked);
+
+  state.supabase = {
+    ...state.supabase,
+    url,
+    anonKey,
+    syncKey,
+    autoSync,
+    lastError: "",
+  };
+
+  persist(false);
+  renderSupabaseStatus();
+  window.alert("Supabase sync settings saved.");
+}
+
+async function onPushToSupabase() {
+  if (!isSupabaseConfigured()) {
+    window.alert("Please fill Supabase URL, Anon Key, and Sync Key first.");
+    return;
+  }
+
+  setSupabaseStatus("Syncing to cloud...");
+  const result = await pushStateToSupabase();
+  if (!result.ok) {
+    setSupabaseStatus(`Sync failed: ${result.error}`);
+    window.alert(`Push failed: ${result.error}`);
+    return;
+  }
+
+  setSupabaseStatus(`Cloud sync updated at ${formatTimestamp(state.supabase.lastSyncedAt)}.`);
+  window.alert("Pushed data to Supabase.");
+}
+
+async function onPullFromSupabase() {
+  if (!isSupabaseConfigured()) {
+    window.alert("Please fill Supabase URL, Anon Key, and Sync Key first.");
+    return;
+  }
+
+  setSupabaseStatus("Fetching cloud data...");
+  const result = await pullStateFromSupabase();
+  if (!result.ok) {
+    setSupabaseStatus(`Pull failed: ${result.error}`);
+    window.alert(`Pull failed: ${result.error}`);
+    return;
+  }
+
+  if (!result.found) {
+    setSupabaseStatus("No cloud data found for this Sync Key yet.");
+    window.alert("No data found in Supabase for this Sync Key.");
+    return;
+  }
+
+  const cloudData = result.payload;
+  state.profiles = (Array.isArray(cloudData.profiles) ? cloudData.profiles : [])
+    .map(normalizeProfile)
+    .filter(Boolean);
+  state.customFoods = (Array.isArray(cloudData.customFoods) ? cloudData.customFoods : [])
+    .map(normalizeFood)
+    .filter(Boolean);
+  state.activeProfileId = state.profiles.some((p) => p.id === cloudData.activeProfileId)
+    ? cloudData.activeProfileId
+    : state.profiles[0]?.id || null;
+
+  persist(false);
+  render();
+  setSupabaseStatus(`Pulled cloud data at ${formatTimestamp(state.supabase.lastSyncedAt)}.`);
+  window.alert("Pulled latest data from Supabase.");
+}
+
 function render() {
   renderProfiles();
 
@@ -272,6 +361,7 @@ function render() {
   maintenanceInput.value = profile.maintenanceCalories;
   targetInput.value = profile.targetCalories;
   trackDateInput.value = selectedDate;
+  renderSupabaseStatus();
 
   renderSummary(profile);
   renderMeals(profile);
@@ -690,11 +780,193 @@ function getFoodLibrary() {
   return [...state.customFoods, ...seedFoods];
 }
 
+function createDefaultSupabaseConfig() {
+  return {
+    url: "",
+    anonKey: "",
+    syncKey: "",
+    autoSync: false,
+    lastSyncedAt: "",
+    lastError: "",
+  };
+}
+
+function normalizeSupabaseConfig(input) {
+  const base = createDefaultSupabaseConfig();
+  if (!input || typeof input !== "object") return base;
+  return {
+    url: normalizeSupabaseUrl(String(input.url || "")),
+    anonKey: String(input.anonKey || ""),
+    syncKey: String(input.syncKey || ""),
+    autoSync: Boolean(input.autoSync),
+    lastSyncedAt: String(input.lastSyncedAt || ""),
+    lastError: String(input.lastError || ""),
+  };
+}
+
+function renderSupabaseStatus() {
+  const config = state.supabase || createDefaultSupabaseConfig();
+  supabaseUrlInput.value = config.url;
+  supabaseAnonKeyInput.value = config.anonKey;
+  supabaseSyncKeyInput.value = config.syncKey;
+  supabaseAutoSyncInput.checked = config.autoSync;
+
+  if (!isSupabaseConfigured()) {
+    supabaseStatusText.textContent = "Cloud sync is not configured.";
+    return;
+  }
+
+  if (config.lastError) {
+    supabaseStatusText.textContent = `Cloud sync error: ${config.lastError}`;
+    return;
+  }
+
+  if (config.lastSyncedAt) {
+    supabaseStatusText.textContent = `Last cloud sync: ${formatTimestamp(config.lastSyncedAt)}`;
+    return;
+  }
+
+  supabaseStatusText.textContent = "Cloud sync configured. Use Push or Pull.";
+}
+
+function setSupabaseStatus(text) {
+  supabaseStatusText.textContent = text;
+}
+
+function isSupabaseConfigured() {
+  const config = state.supabase || createDefaultSupabaseConfig();
+  return Boolean(config.url && config.anonKey && config.syncKey);
+}
+
+function normalizeSupabaseUrl(value) {
+  return value.replace(/\/+$/, "");
+}
+
+function getCloudPayload() {
+  return {
+    profiles: state.profiles,
+    activeProfileId: state.activeProfileId,
+    customFoods: state.customFoods,
+  };
+}
+
+function formatTimestamp(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "unknown";
+  return date.toLocaleString();
+}
+
+function scheduleAutoSync() {
+  if (!state.supabase?.autoSync || !isSupabaseConfigured()) return;
+  if (autoSyncTimer) {
+    clearTimeout(autoSyncTimer);
+  }
+  autoSyncTimer = setTimeout(async () => {
+    const result = await pushStateToSupabase();
+    if (result.ok) {
+      renderSupabaseStatus();
+    }
+  }, 900);
+}
+
+async function pushStateToSupabase() {
+  try {
+    const config = state.supabase;
+    const nowIso = new Date().toISOString();
+    const endpoint = `${config.url}/rest/v1/calorie_states`;
+
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        apikey: config.anonKey,
+        Authorization: `Bearer ${config.anonKey}`,
+        "Content-Type": "application/json",
+        Prefer: "resolution=merge-duplicates,return=representation",
+      },
+      body: JSON.stringify([{
+        sync_key: config.syncKey,
+        payload: getCloudPayload(),
+        updated_at: nowIso,
+      }]),
+    });
+
+    if (!response.ok) {
+      const message = await safeErrorMessage(response);
+      state.supabase.lastError = message;
+      persist(false);
+      return { ok: false, error: message };
+    }
+
+    state.supabase.lastError = "";
+    state.supabase.lastSyncedAt = nowIso;
+    persist(false);
+    return { ok: true };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    state.supabase.lastError = message;
+    persist(false);
+    return { ok: false, error: message };
+  }
+}
+
+async function pullStateFromSupabase() {
+  try {
+    const config = state.supabase;
+    const key = encodeURIComponent(config.syncKey);
+    const endpoint = `${config.url}/rest/v1/calorie_states?sync_key=eq.${key}&select=payload,updated_at&limit=1`;
+    const response = await fetch(endpoint, {
+      headers: {
+        apikey: config.anonKey,
+        Authorization: `Bearer ${config.anonKey}`,
+      },
+    });
+
+    if (!response.ok) {
+      const message = await safeErrorMessage(response);
+      state.supabase.lastError = message;
+      persist(false);
+      return { ok: false, error: message };
+    }
+
+    const data = await response.json();
+    if (!Array.isArray(data) || !data.length) {
+      state.supabase.lastError = "";
+      persist(false);
+      return { ok: true, found: false };
+    }
+
+    const row = data[0];
+    state.supabase.lastError = "";
+    state.supabase.lastSyncedAt = row.updated_at || new Date().toISOString();
+    persist(false);
+
+    return { ok: true, found: true, payload: row.payload || {} };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    state.supabase.lastError = message;
+    persist(false);
+    return { ok: false, error: message };
+  }
+}
+
+async function safeErrorMessage(response) {
+  try {
+    const body = await response.json();
+    if (body && typeof body === "object") {
+      return body.message || body.error || `HTTP ${response.status}`;
+    }
+    return `HTTP ${response.status}`;
+  } catch {
+    return `HTTP ${response.status}`;
+  }
+}
+
 function loadState() {
   const fallback = {
     profiles: [],
     activeProfileId: null,
     customFoods: [],
+    supabase: createDefaultSupabaseConfig(),
   };
 
   try {
@@ -720,14 +992,18 @@ function loadState() {
       profiles,
       activeProfileId,
       customFoods,
+      supabase: normalizeSupabaseConfig(parsed.supabase),
     };
   } catch {
     return fallback;
   }
 }
 
-function persist() {
+function persist(triggerAutoSync = true) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  if (triggerAutoSync) {
+    scheduleAutoSync();
+  }
 }
 
 function normalizeProfile(input) {
