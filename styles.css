@@ -30,6 +30,7 @@ body {
     var(--bg);
   padding: 1rem 1.25rem 1.25rem;
   position: relative;
+  overflow-x: hidden;
 }
 
 .bg-shape {
@@ -99,6 +100,7 @@ p {
   display: grid;
   grid-template-columns: minmax(260px, 320px) 1fr;
   gap: 1rem;
+  min-width: 0;
 }
 
 .panel {
@@ -224,6 +226,7 @@ button.danger {
 .main-panel {
   max-height: calc(100vh - 5.8rem);
   overflow: auto;
+  min-width: 0;
 }
 
 .workspace-head {
@@ -445,7 +448,7 @@ button.danger {
   display: inline;
   white-space: normal;
   overflow-wrap: anywhere;
-  word-break: break-word;
+  word-break: break-all;
 }
 
 .chart-wrap {
@@ -480,6 +483,7 @@ button.danger {
 .food-library {
   margin-top: 1rem;
   min-width: 0;
+  overflow-x: hidden;
 }
 
 .food-library form,
@@ -490,9 +494,15 @@ button.danger {
   width: 100%;
 }
 
+.food-library .inline-form {
+  grid-template-columns: minmax(0, 1fr) !important;
+  overflow-x: hidden;
+}
+
 .food-library input,
 .food-library select,
 .food-library button {
+  width: 100%;
   max-width: 100%;
 }
 
@@ -613,6 +623,19 @@ button.danger {
 
   .inline-form {
     grid-template-columns: 1fr;
+  }
+
+  .food-library .inline-form {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  .food-library input,
+  .food-library select,
+  .food-library button,
+  .food-library label {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0;
   }
 
   .chart-head {
