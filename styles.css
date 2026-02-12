@@ -193,6 +193,18 @@ button.danger {
   background: linear-gradient(135deg, #9e1c35, #d22a4b);
 }
 
+.ghost-btn {
+  background: #f4faf7;
+  color: #1b5b45;
+  border: 1px solid #cfe2d9;
+}
+
+.ghost-btn:hover {
+  transform: none;
+  box-shadow: none;
+  background: #edf6f1;
+}
+
 .muted {
   color: var(--muted);
 }
@@ -464,6 +476,12 @@ button.danger {
   margin-top: 1rem;
 }
 
+.cloud-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.6rem;
+}
+
 .chart-head {
   display: flex;
   justify-content: space-between;
@@ -680,6 +698,10 @@ button.danger {
 
   .chart-head label {
     width: 100%;
+  }
+
+  .cloud-actions {
+    grid-template-columns: 1fr;
   }
 
   .food-library .small {

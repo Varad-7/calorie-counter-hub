@@ -33,6 +33,7 @@ const supabaseAutoSyncInput = document.getElementById("supabaseAutoSyncInput");
 const supabasePushBtn = document.getElementById("supabasePushBtn");
 const supabasePullBtn = document.getElementById("supabasePullBtn");
 const supabaseStatusText = document.getElementById("supabaseStatusText");
+const supabaseToggleBtn = document.getElementById("supabaseToggleBtn");
 
 const seedFoods = buildSeedFoods();
 let selectedDate = isoDate(new Date());
@@ -86,6 +87,7 @@ function attachListeners() {
   supabaseForm.addEventListener("submit", onSaveSupabaseSettings);
   supabasePushBtn.addEventListener("click", onPushToSupabase);
   supabasePullBtn.addEventListener("click", onPullFromSupabase);
+  supabaseToggleBtn.addEventListener("click", toggleSupabaseSettingsVisibility);
 
   historyChart.addEventListener("mousemove", onChartMouseMove);
   historyChart.addEventListener("mouseleave", () => {
@@ -303,6 +305,17 @@ function onSaveSupabaseSettings(event) {
   startAutoPullLoop();
   renderSupabaseStatus();
   window.alert("Supabase sync settings saved.");
+}
+
+function toggleSupabaseSettingsVisibility() {
+  const isHidden = supabaseForm.classList.contains("hidden");
+  if (isHidden) {
+    supabaseForm.classList.remove("hidden");
+    supabaseToggleBtn.textContent = "Hide Cloud Settings";
+  } else {
+    supabaseForm.classList.add("hidden");
+    supabaseToggleBtn.textContent = "Show Cloud Settings";
+  }
 }
 
 async function onPushToSupabase() {
