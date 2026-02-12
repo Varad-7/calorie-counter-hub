@@ -87,7 +87,9 @@ function attachListeners() {
   supabaseForm.addEventListener("submit", onSaveSupabaseSettings);
   supabasePushBtn.addEventListener("click", onPushToSupabase);
   supabasePullBtn.addEventListener("click", onPullFromSupabase);
-  supabaseToggleBtn.addEventListener("click", toggleSupabaseSettingsVisibility);
+  if (supabaseToggleBtn) {
+    supabaseToggleBtn.addEventListener("click", toggleSupabaseSettingsVisibility);
+  }
 
   historyChart.addEventListener("mousemove", onChartMouseMove);
   historyChart.addEventListener("mouseleave", () => {
@@ -308,6 +310,7 @@ function onSaveSupabaseSettings(event) {
 }
 
 function toggleSupabaseSettingsVisibility() {
+  if (!supabaseForm || !supabaseToggleBtn) return;
   const isHidden = supabaseForm.classList.contains("hidden");
   if (isHidden) {
     supabaseForm.classList.remove("hidden");
