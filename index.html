@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Calorie Counter Hub</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="bg-shape bg-shape-a"></div>
+    <div class="bg-shape bg-shape-b"></div>
+
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">Weight Deficit Planner</p>
+        <h1>Calorie Counter Hub</h1>
+      </div>
+      <p id="todayLabel" class="today-label"></p>
+    </header>
+
+    <main class="layout">
+      <aside class="panel profile-panel">
+        <section>
+          <h2>Target Blocks</h2>
+          <p class="muted">Create one block per family member or goal.</p>
+        </section>
+
+        <form id="profileForm" class="stacked-form">
+          <label>
+            Profile Name
+            <input id="newProfileName" type="text" placeholder="e.g. Vikas Cut Phase" required />
+          </label>
+          <label>
+            Maintenance Calories
+            <input id="newProfileMaintenance" type="number" min="1000" max="7000" value="2200" required />
+          </label>
+          <label>
+            Target Calories
+            <input id="newProfileTarget" type="number" min="800" max="7000" value="1800" required />
+          </label>
+          <button type="submit">Create Block</button>
+        </form>
+
+        <div id="profilesList" class="profiles-list"></div>
+      </aside>
+
+      <section class="panel main-panel" id="profileWorkspace">
+        <div id="emptyState" class="empty-state hidden">
+          <h2>No profile selected</h2>
+          <p>Create a target block to begin tracking calories.</p>
+        </div>
+
+        <div id="workspaceContent" class="hidden">
+          <section class="workspace-head">
+            <div>
+              <h2 id="activeProfileTitle"></h2>
+              <p class="muted" id="activeProfileMeta"></p>
+            </div>
+            <button id="deleteProfileBtn" class="danger">Delete Block</button>
+          </section>
+
+          <section class="settings-grid">
+            <article class="subpanel">
+              <h3>Goal Settings</h3>
+              <form id="goalForm" class="inline-form">
+                <label>
+                  Maintenance
+                  <input id="maintenanceInput" type="number" min="1000" max="7000" required />
+                </label>
+                <label>
+                  Target
+                  <input id="targetInput" type="number" min="800" max="7000" required />
+                </label>
+                <button type="submit">Save Goals</button>
+              </form>
+            </article>
+
+            <article class="subpanel">
+              <h3>Day Selector</h3>
+              <label class="single-line">
+                Track Date
+                <input id="trackDateInput" type="date" />
+              </label>
+              <p class="muted small">Meal entries are saved per day.</p>
+            </article>
+          </section>
+
+          <section class="summary-grid" id="summaryGrid"></section>
+
+          <section>
+            <h3>Daily Meals</h3>
+            <div class="meals-grid" id="mealsGrid"></div>
+          </section>
+
+          <section class="chart-section subpanel">
+            <div class="chart-head">
+              <h3>Daily Intake Progress</h3>
+              <label>
+                Range
+                <select id="chartRangeSelect">
+                  <option value="7">7 days</option>
+                  <option value="14" selected>14 days</option>
+                  <option value="30">30 days</option>
+                </select>
+              </label>
+            </div>
+            <div class="chart-wrap">
+              <canvas id="historyChart" aria-label="Daily calorie intake bar chart"></canvas>
+              <div id="chartTooltip" class="chart-tooltip hidden"></div>
+            </div>
+          </section>
+
+          <section class="food-library subpanel">
+            <div class="chart-head">
+              <h3>Food Library</h3>
+              <label>
+                Search
+                <input id="foodSearchInput" type="search" placeholder="Search foods or drinks" />
+              </label>
+            </div>
+
+            <form id="customFoodForm" class="inline-form">
+              <label>
+                Food Name
+                <input id="customFoodName" type="text" placeholder="Add custom item" required />
+              </label>
+              <label>
+                Calories / 100g
+                <input id="customFoodCalories" type="number" min="0" max="1000" required />
+              </label>
+              <label>
+                Default Serving (g)
+                <input id="customFoodServing" type="number" min="1" max="1000" value="100" required />
+              </label>
+              <button type="submit">Add to Library</button>
+            </form>
+
+            <form id="importFoodForm" class="inline-form">
+              <label>
+                Import CSV
+                <input id="foodCsvFile" type="file" accept=".csv,text/csv" required />
+              </label>
+              <button type="submit">Import Foods</button>
+            </form>
+            <p class="muted small">CSV columns: <code>name,category,kcalPer100g,defaultServingG</code></p>
+
+            <div id="foodLibraryTable" class="food-table"></div>
+          </section>
+        </div>
+      </section>
+    </main>
+
+    <datalist id="foodOptions"></datalist>
+
+    <script src="app.js"></script>
+  </body>
+</html>
