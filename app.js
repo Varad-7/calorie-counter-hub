@@ -96,6 +96,14 @@ function attachListeners() {
   });
 
   window.addEventListener("resize", renderChart);
+  window.addEventListener("focus", () => {
+    void syncFromCloudIfNewer();
+  });
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) {
+      void syncFromCloudIfNewer();
+    }
+  });
 }
 
 function onCreateProfile(event) {
@@ -889,7 +897,6 @@ function formatTimestamp(value) {
 
 function scheduleAutoSync() {
   if (!state.supabase?.autoSync || !isSupabaseConfigured()) return;
-  hasUnsyncedLocalChanges = true;
   if (autoSyncTimer) {
     clearTimeout(autoSyncTimer);
   }
@@ -988,33 +995,12 @@ function startAutoPullLoop() {
     autoPullTimer = null;
   }
 
-  if (!state.supabase?.autoSync || !isSupabaseConfigured()) return;
+  if (!isSupabaseConfigured()) return;
+
+  void syncFromCloudIfNewer();
 
   autoPullTimer = setInterval(async () => {
-    if (hasUnsyncedLocalChanges) return;
-    const remoteState = await fetchLatestCloudState();
-    if (!remoteState.ok || !remoteState.found) return;
-
-    const remoteUpdatedAt = Date.parse(remoteState.updatedAt || "");
-    const localUpdatedAt = Date.parse(state.supabase.lastSyncedAt || "");
-    if (!Number.isNaN(remoteUpdatedAt) && !Number.isNaN(localUpdatedAt) && remoteUpdatedAt <= localUpdatedAt) {
-      return;
-    }
-
-    const cloudData = remoteState.payload;
-    state.profiles = (Array.isArray(cloudData.profiles) ? cloudData.profiles : [])
-      .map(normalizeProfile)
-      .filter(Boolean);
-    state.customFoods = (Array.isArray(cloudData.customFoods) ? cloudData.customFoods : [])
-      .map(normalizeFood)
-      .filter(Boolean);
-    state.activeProfileId = state.profiles.some((p) => p.id === cloudData.activeProfileId)
-      ? cloudData.activeProfileId
-      : state.profiles[0]?.id || null;
-    state.supabase.lastSyncedAt = remoteState.updatedAt || new Date().toISOString();
-    state.supabase.lastError = "";
-    persist(false);
-    render();
+    void syncFromCloudIfNewer();
   }, 12000);
 }
 
@@ -1048,6 +1034,36 @@ async function fetchLatestCloudState() {
   } catch {
     return { ok: false, error: "Network error" };
   }
+}
+
+async function syncFromCloudIfNewer() {
+  if (!isSupabaseConfigured()) return;
+  if (hasUnsyncedLocalChanges) return;
+
+  const remoteState = await fetchLatestCloudState();
+  if (!remoteState.ok || !remoteState.found) return;
+
+  const remoteUpdatedAt = Date.parse(remoteState.updatedAt || "");
+  const localUpdatedAt = Date.parse(state.supabase.lastSyncedAt || "");
+  if (!Number.isNaN(remoteUpdatedAt) && !Number.isNaN(localUpdatedAt) && remoteUpdatedAt <= localUpdatedAt) {
+    return;
+  }
+
+  const cloudData = remoteState.payload;
+  state.profiles = (Array.isArray(cloudData.profiles) ? cloudData.profiles : [])
+    .map(normalizeProfile)
+    .filter(Boolean);
+  state.customFoods = (Array.isArray(cloudData.customFoods) ? cloudData.customFoods : [])
+    .map(normalizeFood)
+    .filter(Boolean);
+  state.activeProfileId = state.profiles.some((p) => p.id === cloudData.activeProfileId)
+    ? cloudData.activeProfileId
+    : state.profiles[0]?.id || null;
+  state.supabase.lastSyncedAt = remoteState.updatedAt || new Date().toISOString();
+  state.supabase.lastError = "";
+  hasUnsyncedLocalChanges = false;
+  persist(false);
+  render();
 }
 
 async function safeErrorMessage(response) {
@@ -1102,6 +1118,9 @@ function loadState() {
 
 function persist(triggerAutoSync = true) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  if (triggerAutoSync && isSupabaseConfigured()) {
+    hasUnsyncedLocalChanges = true;
+  }
   if (triggerAutoSync) {
     scheduleAutoSync();
   }
