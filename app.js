@@ -1,6 +1,5 @@
 const STORAGE_KEY = "calorie-counter-hub-v1";
 const MEAL_SLOTS = ["breakfast", "lunch", "snacks", "dinner"];
-const DAY_MS = 24 * 60 * 60 * 1000;
 
 const todayLabel = document.getElementById("todayLabel");
 const profileForm = document.getElementById("profileForm");
@@ -41,6 +40,7 @@ let chartModel = { bars: [], points: [], hoverIndex: -1, targetCalories: 0 };
 let autoSyncTimer = null;
 let autoPullTimer = null;
 let hasUnsyncedLocalChanges = false;
+let lastKnownTodayIso = isoDate(new Date());
 
 let state = loadState();
 
@@ -63,6 +63,7 @@ function init() {
   attachListeners();
   renderSupabaseStatus();
   startAutoPullLoop();
+  startDayRolloverWatcher();
   render();
 }
 
@@ -643,10 +644,11 @@ function renderChart() {
 
 function buildChartPoints(profile, endDateIso, days) {
   const points = [];
-  const endTs = Date.parse(`${endDateIso}T00:00:00`);
+  const endDate = parseIsoLocalDate(endDateIso);
 
   for (let i = days - 1; i >= 0; i -= 1) {
-    const date = new Date(endTs - i * DAY_MS);
+    const date = new Date(endDate.getTime());
+    date.setDate(endDate.getDate() - i);
     const iso = isoDate(date);
     points.push({
       date: iso,
@@ -1094,6 +1096,29 @@ async function safeErrorMessage(response) {
   }
 }
 
+function startDayRolloverWatcher() {
+  window.setInterval(() => {
+    const todayIso = isoDate(new Date());
+    if (todayIso === lastKnownTodayIso) return;
+
+    const shouldFollowToday = selectedDate === lastKnownTodayIso;
+    lastKnownTodayIso = todayIso;
+    todayLabel.textContent = new Date().toLocaleDateString(undefined, {
+      weekday: "long",
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+
+    if (shouldFollowToday) {
+      selectedDate = todayIso;
+      trackDateInput.value = todayIso;
+    }
+
+    render();
+  }, 30000);
+}
+
 function loadState() {
   const fallback = {
     profiles: [],
@@ -1369,7 +1394,16 @@ function formatIsoDate(iso) {
 }
 
 function isoDate(date) {
-  return date.toISOString().slice(0, 10);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function parseIsoLocalDate(iso) {
+  const [year, month, day] = String(iso).split("-").map(Number);
+  if (!year || !month || !day) return new Date();
+  return new Date(year, month - 1, day);
 }
 
 function capitalize(value) {
