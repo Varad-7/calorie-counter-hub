@@ -38,6 +38,8 @@ const seedFoods = buildSeedFoods();
 let selectedDate = isoDate(new Date());
 let chartModel = { bars: [], points: [], hoverIndex: -1, targetCalories: 0 };
 let autoSyncTimer = null;
+let autoPullTimer = null;
+let hasUnsyncedLocalChanges = false;
 
 let state = loadState();
 
@@ -58,6 +60,8 @@ function init() {
   trackDateInput.value = selectedDate;
   updateFoodOptions();
   attachListeners();
+  renderSupabaseStatus();
+  startAutoPullLoop();
   render();
 }
 
@@ -145,6 +149,19 @@ function onDeleteProfile() {
   if (!ok) return;
 
   state.profiles = state.profiles.filter((p) => p.id !== profile.id);
+  state.activeProfileId = state.profiles[0] ? state.profiles[0].id : null;
+  persist();
+  render();
+}
+
+function deleteProfileById(profileId) {
+  const profile = state.profiles.find((item) => item.id === profileId);
+  if (!profile) return;
+
+  const ok = window.confirm(`Delete profile \"${profile.name}\"? This will remove all saved days for this block.`);
+  if (!ok) return;
+
+  state.profiles = state.profiles.filter((item) => item.id !== profileId);
   state.activeProfileId = state.profiles[0] ? state.profiles[0].id : null;
   persist();
   render();
@@ -275,6 +292,7 @@ function onSaveSupabaseSettings(event) {
   };
 
   persist(false);
+  startAutoPullLoop();
   renderSupabaseStatus();
   window.alert("Supabase sync settings saved.");
 }
@@ -327,6 +345,7 @@ async function onPullFromSupabase() {
   state.activeProfileId = state.profiles.some((p) => p.id === cloudData.activeProfileId)
     ? cloudData.activeProfileId
     : state.profiles[0]?.id || null;
+  hasUnsyncedLocalChanges = false;
 
   persist(false);
   render();
@@ -384,7 +403,10 @@ function renderProfiles() {
       const isActive = profile.id === state.activeProfileId;
       return `
         <article class="profile-card ${isActive ? "active" : ""}" data-profile-id="${profile.id}">
-          <strong>${escapeHtml(profile.name)}</strong>
+          <div class="profile-card-head">
+            <strong>${escapeHtml(profile.name)}</strong>
+            <button type="button" class="delete-mini-btn" data-delete-profile-id="${profile.id}" aria-label="Delete ${escapeHtml(profile.name)}">Delete</button>
+          </div>
           <div class="macro"><span>Today</span><strong>${Math.round(todayTotal)} kcal</strong></div>
           <div class="macro"><span>Target</span><span>${profile.targetCalories} kcal</span></div>
           <div class="macro"><span>Deficit</span><span>${Math.round(deficit)} kcal</span></div>
@@ -400,6 +422,13 @@ function renderProfiles() {
       state.activeProfileId = card.dataset.profileId;
       persist();
       render();
+    });
+  });
+
+  Array.from(document.querySelectorAll("[data-delete-profile-id]")).forEach((button) => {
+    button.addEventListener("click", (event) => {
+      event.stopPropagation();
+      deleteProfileById(button.dataset.deleteProfileId);
     });
   });
 }
@@ -813,6 +842,7 @@ function renderSupabaseStatus() {
 
   if (!isSupabaseConfigured()) {
     supabaseStatusText.textContent = "Cloud sync is not configured.";
+    startAutoPullLoop();
     return;
   }
 
@@ -827,6 +857,7 @@ function renderSupabaseStatus() {
   }
 
   supabaseStatusText.textContent = "Cloud sync configured. Use Push or Pull.";
+  startAutoPullLoop();
 }
 
 function setSupabaseStatus(text) {
@@ -858,6 +889,7 @@ function formatTimestamp(value) {
 
 function scheduleAutoSync() {
   if (!state.supabase?.autoSync || !isSupabaseConfigured()) return;
+  hasUnsyncedLocalChanges = true;
   if (autoSyncTimer) {
     clearTimeout(autoSyncTimer);
   }
@@ -899,6 +931,7 @@ async function pushStateToSupabase() {
 
     state.supabase.lastError = "";
     state.supabase.lastSyncedAt = nowIso;
+    hasUnsyncedLocalChanges = false;
     persist(false);
     return { ok: true };
   } catch (error) {
@@ -946,6 +979,74 @@ async function pullStateFromSupabase() {
     state.supabase.lastError = message;
     persist(false);
     return { ok: false, error: message };
+  }
+}
+
+function startAutoPullLoop() {
+  if (autoPullTimer) {
+    clearInterval(autoPullTimer);
+    autoPullTimer = null;
+  }
+
+  if (!state.supabase?.autoSync || !isSupabaseConfigured()) return;
+
+  autoPullTimer = setInterval(async () => {
+    if (hasUnsyncedLocalChanges) return;
+    const remoteState = await fetchLatestCloudState();
+    if (!remoteState.ok || !remoteState.found) return;
+
+    const remoteUpdatedAt = Date.parse(remoteState.updatedAt || "");
+    const localUpdatedAt = Date.parse(state.supabase.lastSyncedAt || "");
+    if (!Number.isNaN(remoteUpdatedAt) && !Number.isNaN(localUpdatedAt) && remoteUpdatedAt <= localUpdatedAt) {
+      return;
+    }
+
+    const cloudData = remoteState.payload;
+    state.profiles = (Array.isArray(cloudData.profiles) ? cloudData.profiles : [])
+      .map(normalizeProfile)
+      .filter(Boolean);
+    state.customFoods = (Array.isArray(cloudData.customFoods) ? cloudData.customFoods : [])
+      .map(normalizeFood)
+      .filter(Boolean);
+    state.activeProfileId = state.profiles.some((p) => p.id === cloudData.activeProfileId)
+      ? cloudData.activeProfileId
+      : state.profiles[0]?.id || null;
+    state.supabase.lastSyncedAt = remoteState.updatedAt || new Date().toISOString();
+    state.supabase.lastError = "";
+    persist(false);
+    render();
+  }, 12000);
+}
+
+async function fetchLatestCloudState() {
+  try {
+    const config = state.supabase;
+    const key = encodeURIComponent(config.syncKey);
+    const endpoint = `${config.url}/rest/v1/calorie_states?sync_key=eq.${key}&select=payload,updated_at&limit=1`;
+    const response = await fetch(endpoint, {
+      headers: {
+        apikey: config.anonKey,
+        Authorization: `Bearer ${config.anonKey}`,
+      },
+    });
+
+    if (!response.ok) {
+      return { ok: false, error: await safeErrorMessage(response) };
+    }
+
+    const data = await response.json();
+    if (!Array.isArray(data) || !data.length) {
+      return { ok: true, found: false };
+    }
+
+    return {
+      ok: true,
+      found: true,
+      payload: data[0].payload || {},
+      updatedAt: data[0].updated_at || "",
+    };
+  } catch {
+    return { ok: false, error: "Network error" };
   }
 }
 

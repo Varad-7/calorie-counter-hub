@@ -234,6 +234,30 @@ button.danger {
   font-size: 0.84rem;
 }
 
+.profile-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.45rem;
+}
+
+.delete-mini-btn {
+  padding: 0.24rem 0.45rem;
+  border-radius: 8px;
+  font-size: 0.72rem;
+  border: 1px solid #efcad4;
+  color: #8f1d36;
+  background: #fff;
+  width: auto;
+  box-shadow: none;
+}
+
+.delete-mini-btn:hover {
+  transform: none;
+  box-shadow: none;
+  background: #fff4f7;
+}
+
 .main-panel {
   max-height: calc(100vh - 5.8rem);
   overflow: auto;
