@@ -39,3 +39,22 @@ Then open `http://localhost:8080`.
 - The app ships with a broad starter food/drinks dataset.
 - For full real-world coverage, keep adding custom foods as needed.
 - All entries and settings are stored in local storage for this browser.
+
+## Publish on GitHub Pages
+
+1. Create a new empty repository on GitHub (for example: `calorie-counter-hub`).
+2. In this project folder, connect and push:
+
+```bash
+git remote add origin https://github.com/<your-username>/<repo-name>.git
+git push -u origin main
+```
+
+3. On GitHub open: `Settings` -> `Pages`.
+4. Under `Build and deployment`, set:
+   - `Source`: `Deploy from a branch`
+   - `Branch`: `main`
+   - `Folder`: `/ (root)`
+5. Save and wait ~1-3 minutes.
+6. Your site will be live at:
+   - `https://<your-username>.github.io/<repo-name>/`
