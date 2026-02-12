@@ -141,6 +141,7 @@ input,
 button,
 select {
   font: inherit;
+  min-width: 0;
 }
 
 input,
@@ -431,6 +432,20 @@ button.danger {
   gap: 1rem;
 }
 
+.chart-head > * {
+  min-width: 0;
+}
+
+.chart-head label {
+  width: min(100%, 420px);
+}
+
+.food-library code {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
 .chart-wrap {
   position: relative;
   border: 1px solid #dce8e2;
@@ -567,6 +582,20 @@ button.danger {
 
   .inline-form {
     grid-template-columns: 1fr;
+  }
+
+  .chart-head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .chart-head label {
+    width: 100%;
+  }
+
+  .food-library .small {
+    font-size: 0.78rem;
+    line-height: 1.35;
   }
 
   button {
